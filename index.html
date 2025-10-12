@@ -26,11 +26,6 @@
                 </div>
             </div>
             <div v-if="showCipherInfo" class="p-4 space-y-3">
-                <div>
-                    <h3 class="font-semibold text-gray-800">🔄 Совместимость версий</h3>
-                    <p class="text-gray-600 text-sm">Веб-версия полностью совместима с Python-реализацией. Вы можете шифровать в браузере и дешифровать в Python, и наоборот.</p>
-                </div>
-                
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <h3 class="font-semibold text-gray-800">📊 Основные характеристики:</h3>
@@ -40,7 +35,7 @@
                             <li><strong>Режим:</strong> CBC (Cipher Block Chaining)</li>
                             <li><strong>Раунды:</strong> 12 раундов Feistel сети</li>
                             <li><strong>Аутентификация:</strong> HMAC-SHA256</li>
-                            <li><strong>Длина ключа:</strong> от 20 символов</li>
+                            <li><strong>Длина ключа:</strong> от 8 символов</li>
                         </ul>
                     </div>
                     
@@ -49,17 +44,9 @@
                         <ul class="text-gray-600 text-sm list-disc list-inside space-y-1">
                             <li><strong>Cipher Key:</strong> 32 байта для шифрования</li>
                             <li><strong>MAC Key:</strong> 32 байта для аутентификации</li>
-                            <li><strong>Соль:</strong> srpc_v2_salt_2024_secure_random_bytes</li>
                             <li><strong>Кодирование:</strong> Base36 с группировкой</li>
                         </ul>
                     </div>
-                </div>
-
-                <div class="bg-green-50 border-l-4 border-green-400 p-3">
-                    <p class="text-green-700 text-sm">
-                        <strong>✅ Совместимость:</strong> Эта версия полностью идентична Python-реализации. 
-                        Тексты, зашифрованные здесь, можно расшифровать в Python и наоборот.
-                    </p>
                 </div>
             </div>
         </div>
@@ -85,16 +72,16 @@
                     <label class="block p-4 border-b border-gray-200 text-sm font-medium text-gray-700">
                         Мастер-ключ:
                         <span class="text-xs font-normal text-gray-500 ml-1">
-                            (мин. 20 символов, сейчас: {{ masterKey.length }})
+                            (мин. 8 символов, сейчас: {{ masterKey.length }})
                         </span>
                     </label>
                     <div class="p-4">
                         <input 
                             type="text" 
                             v-model="masterKey" 
-                            placeholder="Введите секретный ключ (минимум 20 символов)"
+                            placeholder="Введите секретный ключ (минимум 8 символов)"
                             class="w-full p-3 border border-gray-300 rounded-md"
-                            :class="{'border-red-500': masterKey.length > 0 && masterKey.length < 20}"
+                            :class="{'border-red-500': masterKey.length > 0 && masterKey.length < 8}"
                             @input="generateDerivedKeys"
                         >
                         
@@ -131,8 +118,8 @@
                         </div>
 
                         <!-- Предупреждение о коротком ключе -->
-                        <div v-if="masterKey.length > 0 && masterKey.length < 20" class="mt-2 text-sm text-red-600 text-center">
-                            ⚠️ Ключ слишком короткий! Минимальная длина - 20 символов.
+                        <div v-if="masterKey.length > 0 && masterKey.length < 8" class="mt-2 text-sm text-red-600 text-center">
+                            ⚠️ Ключ слишком короткий! Минимальная длина - 8 символов.
                         </div>
                     </div>
                 </div>
@@ -294,7 +281,7 @@
                 });
 
                 const generateDerivedKeys = () => {
-                    if (!masterKey.value || masterKey.value.length < 20) {
+                    if (!masterKey.value || masterKey.value.length < 8) {
                         cipherKey.value = '';
                         macKey.value = '';
                         return;
@@ -333,8 +320,8 @@
                         showKeyStatus('Ошибка: Ключ не может быть пустым', 'error');
                         return;
                     }
-                    if (masterKey.value.length < 20) {
-                        showKeyStatus('Ошибка: Ключ должен быть не менее 20 символов', 'error');
+                    if (masterKey.value.length < 8) {
+                        showKeyStatus('Ошибка: Ключ должен быть не менее 8 символов', 'error');
                         return;
                     }
                     try {
@@ -376,7 +363,7 @@
 
                 const generateRandomKey = () => {
                     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
-                    const length = Math.floor(Math.random() * 11) + 20; // 20-30 символов
+                    const length = Math.floor(Math.random() * 11) + 8; // 20-30 символов
                     let result = '';
                     
                     for (let i = 0; i < length; i++) {
@@ -438,8 +425,8 @@
                         if (!key) {
                             throw new Error("Ключ не может быть пустым");
                         }
-                        if (key.length < 20) {
-                            throw new Error("Длина ключа должна быть не менее 20 символов");
+                        if (key.length < 8) {
+                            throw new Error("Длина ключа должна быть не менее 8 символов");
                         }
 
                         this.masterKey = key;
@@ -829,8 +816,8 @@
                         showStatus('Ошибка: Введите ключ', 'error');
                         return;
                     }
-                    if (masterKey.value.length < 20) {
-                        showStatus('Ошибка: Ключ должен быть не менее 20 символов', 'error');
+                    if (masterKey.value.length < 8) {
+                        showStatus('Ошибка: Ключ должен быть не менее 8 символов', 'error');
                         return;
                     }
 
