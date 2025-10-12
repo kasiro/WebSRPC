@@ -191,7 +191,7 @@
                         <div class="flex space-x-3">
                             <button 
                                 @click="processSRPC"
-                                :disabled="masterKey.length < 20"
+                                :disabled="masterKey.length < 8"
                                 class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
                                 {{ srpcMode === 'encrypt' ? 'Зашифровать' : 'Расшифровать' }}
