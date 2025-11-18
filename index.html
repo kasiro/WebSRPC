@@ -34,7 +34,7 @@
                             <li><strong>Режим:</strong> CBC (Cipher Block Chaining)</li>
                             <li><strong>Раунды:</strong> 12 раундов Feistel сети</li>
                             <li><strong>Аутентификация:</strong> HMAC-SHA256</li>
-                            <li><strong>Длина ключа:</strong> от 20 символов</li>
+                            <li><strong>Длина ключа:</strong> от 8 символов</li>
                         </ul>
                     </div>
                     
@@ -71,7 +71,7 @@
                     <label class="block p-4 border-b border-gray-200 text-sm font-medium text-gray-700">
                         Мастер-ключ:
                         <span class="text-xs font-normal text-gray-500 ml-1">
-                            (мин. 20 символов, сейчас: <span id="key-length">0</span>)
+                            (мин. 8 символов, сейчас: <span id="key-length">0</span>)
                         </span>
                     </label>
                     <div class="p-4">
@@ -118,7 +118,7 @@
 
                         <!-- Предупреждение о коротком ключе -->
                         <div id="key-warning" class="mt-2 text-sm text-red-600 text-center hidden">
-                            ⚠️ Ключ слишком короткий! Минимальная длина - 20 символов.
+                            ⚠️ Ключ слишком короткий! Минимальная длина - 8 символов.
                         </div>
                     </div>
                 </div>
@@ -171,7 +171,7 @@
             </label>
             <textarea 
                 id="outputText" 
-                placeholder="Здесь появится результат после загрузки..."
+                placeholder="Здесь появится результат..."
                 readonly
                 class="w-full h-48 p-4 outline-none resize-none font-mono text-sm"
             ></textarea>
@@ -203,6 +203,7 @@
     <script>
         let pyodide;
         let srpcModule;
+        const minLength = 8;
 
         // Инициализация Pyodide
         async function initializePyodide() {
@@ -548,7 +549,7 @@ srpc_instance = None
             const masterKey = document.getElementById('masterKey').value;
             const mode = document.getElementById('srpcMode').value;
             
-            if (!masterKey || masterKey.length < 20 || !inputText) {
+            if (!masterKey || masterKey.length < minLength || !inputText) {
                 showStatus('Проверьте ввод ключа и текста', 'error');
                 return;
             }
@@ -609,7 +610,7 @@ srpc_instance = None
             
             lengthSpan.textContent = key.length;
             
-            if (key.length > 0 && key.length < 20) {
+            if (key.length > 0 && key.length < minLength) {
                 warning.classList.remove('hidden');
             } else {
                 warning.classList.add('hidden');
@@ -636,7 +637,7 @@ srpc_instance = None
                 showKeyStatus('Ошибка: Ключ не может быть пустым', 'error');
                 return;
             }
-            if (key.length < 20) {
+            if (key.length < minLength) {
                 showKeyStatus('Ошибка: Ключ должен быть не менее 20 символов', 'error');
                 return;
             }
