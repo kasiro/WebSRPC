@@ -79,9 +79,9 @@
                         <input 
                             type="text" 
                             v-model="masterKey" 
-                            placeholder="Введите секретный ключ (минимум 8 символов)"
+                            placeholder="Введите секретный ключ (минимум 20 символов)"
                             class="w-full p-3 border border-gray-300 rounded-md"
-                            :class="{'border-red-500': masterKey.length > 0 && masterKey.length < 8}"
+                            :class="{'border-red-500': masterKey.length > 0 && masterKey.length < 20}"
                             @input="generateDerivedKeys"
                         >
                         
@@ -118,8 +118,8 @@
                         </div>
 
                         <!-- Предупреждение о коротком ключе -->
-                        <div v-if="masterKey.length > 0 && masterKey.length < 8" class="mt-2 text-sm text-red-600 text-center">
-                            ⚠️ Ключ слишком короткий! Минимальная длина - 8 символов.
+                        <div v-if="masterKey.length > 0 && masterKey.length < 20" class="mt-2 text-sm text-red-600 text-center">
+                            ⚠️ Ключ слишком короткий! Минимальная длина - 20 символов.
                         </div>
                     </div>
                 </div>
@@ -191,7 +191,7 @@
                         <div class="flex space-x-3">
                             <button 
                                 @click="processSRPC"
-                                :disabled="masterKey.length < 8"
+                                :disabled="masterKey.length < 20"
                                 class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
                                 {{ srpcMode === 'encrypt' ? 'Зашифровать' : 'Расшифровать' }}
@@ -269,6 +269,7 @@
                 const SALT = "srpc_v2_salt_2024_secure_random_bytes";
                 const BLOCK_SIZE = 16;
                 const ROUNDS = 12;
+                const PASS_MIN_LENGTH = 8;
 
                 // Загрузка ключа и генерация производных при старте
                 onMounted(() => {
@@ -281,7 +282,7 @@
                 });
 
                 const generateDerivedKeys = () => {
-                    if (!masterKey.value || masterKey.value.length < 8) {
+                    if (!masterKey.value || masterKey.value.length < PASS_MIN_LENGTH) {
                         cipherKey.value = '';
                         macKey.value = '';
                         return;
@@ -320,8 +321,8 @@
                         showKeyStatus('Ошибка: Ключ не может быть пустым', 'error');
                         return;
                     }
-                    if (masterKey.value.length < 8) {
-                        showKeyStatus('Ошибка: Ключ должен быть не менее 8 символов', 'error');
+                    if (masterKey.value.length < PASS_MIN_LENGTH) {
+                        showKeyStatus('Ошибка: Ключ должен быть не менее 20 символов', 'error');
                         return;
                     }
                     try {
@@ -363,7 +364,7 @@
 
                 const generateRandomKey = () => {
                     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
-                    const length = Math.floor(Math.random() * 11) + 8; // 20-30 символов
+                    const length = Math.floor(Math.random() * 11) + PASS_MIN_LENGTH;
                     let result = '';
                     
                     for (let i = 0; i < length; i++) {
@@ -425,8 +426,8 @@
                         if (!key) {
                             throw new Error("Ключ не может быть пустым");
                         }
-                        if (key.length < 8) {
-                            throw new Error("Длина ключа должна быть не менее 8 символов");
+                        if (key.length < PASS_MIN_LENGTH) {
+                            throw new Error("Длина ключа должна быть не менее 20 символов");
                         }
 
                         this.masterKey = key;
@@ -816,8 +817,8 @@
                         showStatus('Ошибка: Введите ключ', 'error');
                         return;
                     }
-                    if (masterKey.value.length < 8) {
-                        showStatus('Ошибка: Ключ должен быть не менее 8 символов', 'error');
+                    if (masterKey.value.length < PASS_MIN_LENGTH) {
+                        showStatus('Ошибка: Ключ должен быть не менее 20 символов', 'error');
                         return;
                     }
 
