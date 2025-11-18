@@ -5,27 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SRPC Шифровальщик</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div id="app" class="container mx-auto p-4">
         <header class="text-center mb-8">
             <h1 class="text-3xl font-bold text-gray-800">SRPC Шифровальщик</h1>
-            <p class="text-gray-600">Secure Russian Polygraphic Cipher - Совместимая версия</p>
+            <p class="text-gray-600">Secure Russian Polygraphic Cipher</p>
         </header>
 
         <!-- Секция с описанием шифра -->
         <div class="mb-6 bg-white rounded-lg shadow overflow-hidden">
-            <div class="bg-blue-500 text-white p-4 cursor-pointer" @click="toggleCipherInfo">
+            <div class="bg-blue-500 text-white p-4 cursor-pointer" onclick="toggleCipherInfo()">
                 <div class="flex justify-between items-center">
                     <h2 class="text-xl font-bold">О шифре SRPC</h2>
-                    <svg class="w-5 h-5 transform transition-transform" :class="{'rotate-180': !showCipherInfo}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg id="cipher-arrow" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                     </svg>
                 </div>
             </div>
-            <div v-if="showCipherInfo" class="p-4 space-y-3">
+            <div id="cipher-info" class="p-4 space-y-3 hidden">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <h3 class="font-semibold text-gray-800">📊 Основные характеристики:</h3>
@@ -35,7 +34,7 @@
                             <li><strong>Режим:</strong> CBC (Cipher Block Chaining)</li>
                             <li><strong>Раунды:</strong> 12 раундов Feistel сети</li>
                             <li><strong>Аутентификация:</strong> HMAC-SHA256</li>
-                            <li><strong>Длина ключа:</strong> от 8 символов</li>
+                            <li><strong>Длина ключа:</strong> от 20 символов</li>
                         </ul>
                     </div>
                     
@@ -61,8 +60,8 @@
                         Текст для обработки:
                     </label>
                     <textarea 
-                        v-model="inputText" 
-                        :placeholder="srpcMode === 'encrypt' ? 'Введите текст для шифрования...' : 'Введите текст для дешифрования...'"
+                        id="inputText" 
+                        placeholder="Введите текст для шифрования..."
                         class="w-full h-48 p-4 outline-none resize-none"
                     ></textarea>
                 </div>
@@ -72,44 +71,44 @@
                     <label class="block p-4 border-b border-gray-200 text-sm font-medium text-gray-700">
                         Мастер-ключ:
                         <span class="text-xs font-normal text-gray-500 ml-1">
-                            (мин. 8 символов, сейчас: {{ masterKey.length }})
+                            (мин. 20 символов, сейчас: <span id="key-length">0</span>)
                         </span>
                     </label>
                     <div class="p-4">
                         <input 
                             type="text" 
-                            v-model="masterKey" 
+                            id="masterKey" 
+                            value="test_reversibility_extended_key_has_crypto"
                             placeholder="Введите секретный ключ (минимум 20 символов)"
                             class="w-full p-3 border border-gray-300 rounded-md"
-                            :class="{'border-red-500': masterKey.length > 0 && masterKey.length < 20}"
-                            @input="generateDerivedKeys"
+                            oninput="updateKeyLength()"
                         >
                         
                         <!-- Кнопки управления ключом -->
                         <div class="mt-3 grid grid-cols-2 gap-2">
                             <button 
-                                @click="saveKey"
+                                onclick="saveKey()"
                                 class="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors flex items-center justify-center space-x-1 text-sm"
                             >
                                 <span>💾</span>
                                 <span>Сохранить</span>
                             </button>
                             <button 
-                                @click="loadKey"
+                                onclick="loadKey()"
                                 class="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center justify-center space-x-1 text-sm"
                             >
                                 <span>📂</span>
                                 <span>Загрузить</span>
                             </button>
                             <button 
-                                @click="generateRandomKey"
+                                onclick="generateRandomKey()"
                                 class="px-3 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors flex items-center justify-center space-x-1 text-sm"
                             >
                                 <span>🎲</span>
                                 <span>Случайный</span>
                             </button>
                             <button 
-                                @click="clearKey"
+                                onclick="clearKey()"
                                 class="px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors flex items-center justify-center space-x-1 text-sm"
                             >
                                 <span>🗑️</span>
@@ -118,70 +117,22 @@
                         </div>
 
                         <!-- Предупреждение о коротком ключе -->
-                        <div v-if="masterKey.length > 0 && masterKey.length < 20" class="mt-2 text-sm text-red-600 text-center">
+                        <div id="key-warning" class="mt-2 text-sm text-red-600 text-center hidden">
                             ⚠️ Ключ слишком короткий! Минимальная длина - 20 символов.
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Правая колонка: Сгенерированные ключи и управление -->
+            <!-- Правая колонка: Управление -->
             <div class="space-y-6">
-                <!-- Сгенерированные ключи -->
-                <div class="bg-white rounded-lg shadow">
-                    <label class="block p-4 border-b border-gray-200 text-sm font-medium text-gray-700">
-                        Сгенерированные ключи:
-                    </label>
-                    <div class="p-4 space-y-4">
-                        <!-- Cipher Key -->
-                        <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Cipher Key (шифрование):</label>
-                            <div class="flex items-center space-x-2">
-                                <input 
-                                    type="text" 
-                                    v-model="cipherKey" 
-                                    readonly
-                                    class="flex-1 p-2 bg-gray-50 border border-gray-200 rounded text-sm font-mono"
-                                >
-                                <button 
-                                    @click="copyCipherKey"
-                                    class="px-3 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors text-xs"
-                                >
-                                    📋
-                                </button>
-                            </div>
-                            <div class="text-xs text-gray-500 mt-1">{{ cipherKey.length / 2 }} байт</div>
-                        </div>
-
-                        <!-- MAC Key -->
-                        <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">MAC Key (аутентификация):</label>
-                            <div class="flex items-center space-x-2">
-                                <input 
-                                    type="text" 
-                                    v-model="macKey" 
-                                    readonly
-                                    class="flex-1 p-2 bg-gray-50 border border-gray-200 rounded text-sm font-mono"
-                                >
-                                <button 
-                                    @click="copyMacKey"
-                                    class="px-3 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition-colors text-xs"
-                                >
-                                    📋
-                                </button>
-                            </div>
-                            <div class="text-xs text-gray-500 mt-1">{{ macKey.length / 2 }} байт</div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Управление и статус -->
                 <div class="bg-white rounded-lg shadow p-4">
                     <div class="space-y-4">
                         <!-- Режим -->
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Режим:</label>
-                            <select v-model="srpcMode" class="w-full p-2 border border-gray-300 rounded-md">
+                            <select id="srpcMode" class="w-full p-2 border border-gray-300 rounded-md">
                                 <option value="encrypt">Шифрование</option>
                                 <option value="decrypt">Дешифрование</option>
                             </select>
@@ -190,14 +141,15 @@
                         <!-- Кнопки выполнения -->
                         <div class="flex space-x-3">
                             <button 
-                                @click="processSRPC"
-                                :disabled="masterKey.length < 20"
+                                id="processBtn"
+                                onclick="processSRPC()"
+                                disabled
                                 class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                             >
-                                {{ srpcMode === 'encrypt' ? 'Зашифровать' : 'Расшифровать' }}
+                                Зашифровать
                             </button>
                             <button 
-                                @click="clearAll"
+                                onclick="clearAll()"
                                 class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
                             >
                                 Очистить
@@ -205,12 +157,11 @@
                         </div>
 
                         <!-- Статус ключей -->
-                        <div v-if="keyStatus" class="text-sm text-center p-2 rounded" :class="keyStatusClass">
-                            {{ keyStatus }}
-                        </div>
+                        <div id="key-status" class="text-sm text-center p-2 rounded hidden"></div>
                     </div>
                 </div>
-            </div>
+
+           </div>
         </div>
 
         <!-- Результат -->
@@ -219,693 +170,609 @@
                 Результат:
             </label>
             <textarea 
-                v-model="outputText" 
-                placeholder="Здесь появится результат..."
+                id="outputText" 
+                placeholder="Здесь появится результат после загрузки..."
                 readonly
                 class="w-full h-48 p-4 outline-none resize-none font-mono text-sm"
             ></textarea>
         </div>
 
         <!-- Статус операции -->
-        <div v-if="statusMessage" class="mb-4 p-4 rounded-lg" :class="statusClass">
-            <p class="text-sm font-medium">{{ statusMessage }}</p>
+        <div id="status-message" class="mb-4 p-4 rounded-lg hidden">
+            <p class="text-sm font-medium" id="status-text"></p>
         </div>
 
         <!-- Дополнительные действия -->
         <div class="flex justify-center space-x-4">
             <button 
-                @click="copyToClipboard"
+                onclick="copyToClipboard()"
                 class="px-6 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
             >
                 Копировать результат
             </button>
             <button 
-                @click="swapTexts"
+                onclick="swapTexts()"
                 class="px-6 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors"
             >
                 Поменять местами
             </button>
         </div>
-    </div>
+
+   </div>
 
     <script>
-        const { createApp, ref, onMounted, watch } = Vue;
+        let pyodide;
+        let srpcModule;
 
-        createApp({
-            setup() {
-                const inputText = ref('');
-                const outputText = ref('');
-                const masterKey = ref('test_reversibility_extended_key_has_crypto');
-                const cipherKey = ref('');
-                const macKey = ref('');
-                const srpcMode = ref('encrypt');
-                const statusMessage = ref('');
-                const statusClass = ref('bg-blue-50 text-blue-700');
-                const showCipherInfo = ref(false);
-                const keyStatus = ref('');
-                const keyStatusClass = ref('text-gray-600');
-
-                // Константы как в Python версии
-                const SALT = "srpc_v2_salt_2024_secure_random_bytes";
-                const BLOCK_SIZE = 16;
-                const ROUNDS = 12;
-                const PASS_MIN_LENGTH = 8;
-
-                // Загрузка ключа и генерация производных при старте
-                onMounted(() => {
-                    loadKeyOnStart();
+        // Инициализация Pyodide
+        async function initializePyodide() {
+            try {
+                pyodide = await loadPyodide({
+                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.23.4/full/",
+                    stdout: () => {},
+                    stderr: () => {},
+                    fullStdLib: false
                 });
-
-                // Следим за изменением мастер-ключа
-                watch(masterKey, () => {
-                    generateDerivedKeys();
-                });
-
-                const generateDerivedKeys = () => {
-                    if (!masterKey.value || masterKey.value.length < PASS_MIN_LENGTH) {
-                        cipherKey.value = '';
-                        macKey.value = '';
-                        return;
-                    }
-
-                    try {
-                        // Генерация ключей как в Python версии
-                        const saltedKey = masterKey.value + SALT;
-                        
-                        // Cipher Key
-                        const cipherHmac = CryptoJS.HmacSHA256("cipher_key_derivation", saltedKey);
-                        cipherKey.value = cipherHmac.toString(CryptoJS.enc.Hex);
-                        
-                        // MAC Key
-                        const macHmac = CryptoJS.HmacSHA256("mac_key_derivation", saltedKey);
-                        macKey.value = macHmac.toString(CryptoJS.enc.Hex);
-                    } catch (error) {
-                        console.error('Key generation error:', error);
-                    }
-                };
-
-                const loadKeyOnStart = () => {
-                    try {
-                        const savedKey = localStorage.getItem('srpc_key');
-                        if (savedKey) {
-                            masterKey.value = savedKey;
-                            showKeyStatus('Ключ загружен автоматически', 'success');
-                        }
-                    } catch (error) {
-                        console.warn('Не удалось загрузить ключ из LocalStorage:', error);
-                    }
-                };
-
-                const saveKey = () => {
-                    if (!masterKey.value.trim()) {
-                        showKeyStatus('Ошибка: Ключ не может быть пустым', 'error');
-                        return;
-                    }
-                    if (masterKey.value.length < PASS_MIN_LENGTH) {
-                        showKeyStatus('Ошибка: Ключ должен быть не менее 20 символов', 'error');
-                        return;
-                    }
-                    try {
-                        localStorage.setItem('srpc_key', masterKey.value);
-                        showKeyStatus('Ключ успешно сохранен', 'success');
-                    } catch (error) {
-                        showKeyStatus('Ошибка сохранения ключа', 'error');
-                        console.error('Save key error:', error);
-                    }
-                };
-
-                const loadKey = () => {
-                    try {
-                        const savedKey = localStorage.getItem('srpc_key');
-                        if (savedKey) {
-                            masterKey.value = savedKey;
-                            showKeyStatus('Ключ загружен', 'success');
-                        } else {
-                            showKeyStatus('Сохраненный ключ не найден', 'warning');
-                        }
-                    } catch (error) {
-                        showKeyStatus('Ошибка загрузки ключа', 'error');
-                        console.error('Load key error:', error);
-                    }
-                };
-
-                const clearKey = () => {
-                    try {
-                        localStorage.removeItem('srpc_key');
-                        masterKey.value = '';
-                        cipherKey.value = '';
-                        macKey.value = '';
-                        showKeyStatus('Ключ удален', 'info');
-                    } catch (error) {
-                        showKeyStatus('Ошибка удаления ключа', 'error');
-                        console.error('Clear key error:', error);
-                    }
-                };
-
-                const generateRandomKey = () => {
-                    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
-                    const length = Math.floor(Math.random() * 11) + PASS_MIN_LENGTH;
-                    let result = '';
-                    
-                    for (let i = 0; i < length; i++) {
-                        result += chars.charAt(Math.floor(Math.random() * chars.length));
-                    }
-                    
-                    masterKey.value = result;
-                    showKeyStatus(`Сгенерирован случайный ключ (${length} символов)`, 'success');
-                };
-
-                const copyCipherKey = async () => {
-                    try {
-                        await navigator.clipboard.writeText(cipherKey.value);
-                        showKeyStatus('Cipher Key скопирован', 'success');
-                    } catch (err) {
-                        showKeyStatus('Ошибка копирования Cipher Key', 'error');
-                    }
-                };
-
-                const copyMacKey = async () => {
-                    try {
-                        await navigator.clipboard.writeText(macKey.value);
-                        showKeyStatus('MAC Key скопирован', 'success');
-                    } catch (err) {
-                        showKeyStatus('Ошибка копирования MAC Key', 'error');
-                    }
-                };
-
-                const showKeyStatus = (message, type) => {
-                    keyStatus.value = message;
-                    switch (type) {
-                        case 'success':
-                            keyStatusClass.value = 'bg-green-50 text-green-700 border border-green-200';
-                            break;
-                        case 'error':
-                            keyStatusClass.value = 'bg-red-50 text-red-700 border border-red-200';
-                            break;
-                        case 'warning':
-                            keyStatusClass.value = 'bg-yellow-50 text-yellow-700 border border-yellow-200';
-                            break;
-                        case 'info':
-                            keyStatusClass.value = 'bg-blue-50 text-blue-700 border border-blue-200';
-                            break;
-                        default:
-                            keyStatusClass.value = 'bg-gray-50 text-gray-700 border border-gray-200';
-                    }
-                    setTimeout(() => {
-                        keyStatus.value = '';
-                    }, 3000);
-                };
-
-                const toggleCipherInfo = () => {
-                    showCipherInfo.value = !showCipherInfo.value;
-                };
-
-                // Полностью совместимая реализация SRPC с Python версией
-                class SRPC {
-                    constructor(key) {
-                        if (!key) {
-                            throw new Error("Ключ не может быть пустым");
-                        }
-                        if (key.length < PASS_MIN_LENGTH) {
-                            throw new Error("Длина ключа должна быть не менее 20 символов");
-                        }
-
-                        this.masterKey = key;
-                        this.SALT = "srpc_v2_salt_2024_secure_random_bytes";
-
-                        // Алфавит идентичный Python версии
-                        this.plainAlphabet = (
-                            "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ" +
-                            "абвгдеёжзийклмнопрстуфхцчшщъыьэюя" +
-                            "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
-                            "abcdefghijklmnopqrstuvwxyz" +
-                            "0123456789 \n" +
-                            "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
-                        );
-                        this.alphabetSize = this.plainAlphabet.length;
-                        this.base36 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-                        this.base36Size = 36;
-                        this.blockSize = BLOCK_SIZE;
-                        this.rounds = ROUNDS;
-
-                        // Проверка как в Python
-                        if (this.alphabetSize ** this.blockSize > this.base36Size ** 24) {
-                            throw new Error("Алфавит слишком велик для 16→24 схемы");
-                        }
-
-                        // Генерация ключей через HMAC-SHA256 с солью
-                        const saltedKey = key + this.SALT;
-                        this.cipherKey = CryptoJS.HmacSHA256("cipher_key_derivation", saltedKey).toString(CryptoJS.enc.Hex);
-                        this.macKey = CryptoJS.HmacSHA256("mac_key_derivation", saltedKey).toString(CryptoJS.enc.Hex);
-
-                        // Перемешанный алфавит и S-Box
-                        this.shuffledAlphabet = this._shuffleAlphabet(this.plainAlphabet, this.cipherKey);
-                        this.sbox = this._generateSBox(this.cipherKey);
-                    }
-
-                    _shuffleAlphabet(alphabet, keyMaterial) {
-                        const letters = alphabet.split('');
-                        const n = letters.length;
-                        const keyBytes = this._hexToBytes(keyMaterial);
-                        
-                        for (let i = n - 1; i > 0; i--) {
-                            const j = keyBytes[i % keyBytes.length] % (i + 1);
-                            [letters[i], letters[j]] = [letters[j], letters[i]];
-                        }
-                        return letters.join('');
-                    }
-
-                    _hexToBytes(hex) {
-                        const bytes = [];
-                        for (let i = 0; i < hex.length; i += 2) {
-                            bytes.push(parseInt(hex.substr(i, 2), 16));
-                        }
-                        return bytes;
-                    }
-
-                    _generateSBox(keyMaterial) {
-                        const indices = Array.from({length: this.alphabetSize}, (_, i) => i);
-                        const keyBytes = this._hexToBytes(keyMaterial);
-                        const n = indices.length;
-
-                        for (let i = n - 1; i > 0; i--) {
-                            const j = keyBytes[i % keyBytes.length] % (i + 1);
-                            [indices[i], indices[j]] = [indices[j], indices[i]];
-                        }
-                        return indices;
-                    }
-
-                    _toBase36(num) {
-                        if (num === 0) return this.base36[0];
-                        let result = '';
-                        let n = BigInt(num);
-                        const base = BigInt(this.base36Size);
-                        
-                        while (n > 0) {
-                            const remainder = Number(n % base);
-                            result = this.base36[remainder] + result;
-                            n = n / base;
-                        }
-                        return result;
-                    }
-
-                    _fromBase36(str) {
-                        let num = BigInt(0);
-                        const base = BigInt(this.base36Size);
-                        
-                        for (let i = 0; i < str.length; i++) {
-                            const ch = str[i];
-                            let val;
-                            if (ch >= 'A' && ch <= 'Z') {
-                                val = BigInt(ch.charCodeAt(0) - 'A'.charCodeAt(0));
-                            } else {
-                                val = BigInt(ch.charCodeAt(0) - '0'.charCodeAt(0) + 26);
-                            }
-                            num = num * base + val;
-                        }
-                        return num;
-                    }
-
-                    _pad(text, blockSize = this.blockSize) {
-                        let padLen = blockSize - (text.length % blockSize);
-                        if (padLen === 0) {
-                            padLen = blockSize;  // Вот это ключевое отличие!
-                        }
-                        const paddingChar = this.shuffledAlphabet[(padLen - 1) % this.alphabetSize];
-                        return text + paddingChar.repeat(padLen);
-                    }
-
-                    _unpad(text) {
-                        if (!text) return text;
-                        const lastChar = text[text.length - 1];
-                        const padIdx = this.shuffledAlphabet.indexOf(lastChar);
-                        
-                        if (padIdx === -1) {
-                            throw new Error("Некорректный символ паддинга");
-                        }
-                        
-                        const padLen = padIdx + 1;
-                        
-                        // РАЗРЕШИТЬ padLen равный blockSize
-                        if (padLen < 1 || padLen > this.blockSize) {
-                            throw new Error(`Некорректная длина паддинга ${padLen} > ${this.blockSize}`);
-                        }
-
-                        if (text.length < padLen || text.slice(-padLen) !== lastChar.repeat(padLen)) {
-                            throw new Error("Некорректный паддинг");
-                        }
-
-                        return text.slice(0, -padLen);
-                    }
-
-                    _textToBlocks(text) {
-                        const padded = this._pad(text, this.blockSize);
-                        const blocks = [];
-                        for (let i = 0; i < padded.length; i += this.blockSize) {
-                            blocks.push(padded.slice(i, i + this.blockSize));
-                        }
-                        return blocks;
-                    }
-
-                    // _BlocksToText(blocks) {
-                    //     return this._unpad();
-                    // }
-
-                    _applySbox(ch) {
-                        const idx = this.shuffledAlphabet.indexOf(ch);
-                        const newIdx = this.sbox[idx];
-                        return this.shuffledAlphabet[newIdx];
-                    }
-
-                    _applyInverseSbox(ch) {
-                        const idx = this.shuffledAlphabet.indexOf(ch);
-                        for (let i = 0; i < this.sbox.length; i++) {
-                            if (this.sbox[i] === idx) {
-                                return this.shuffledAlphabet[i];
-                            }
-                        }
-                        return ch;
-                    }
-
-                    _mixBlocks(block, prev) {
-                        const alphabet = this.shuffledAlphabet;
-                        const n = this.alphabetSize;
-                        let result = '';
-                        for (let i = 0; i < block.length; i++) {
-                            const idx1 = alphabet.indexOf(block[i]);
-                            const idx2 = alphabet.indexOf(prev[i]);
-                            const mixedIdx = (idx1 + idx2) % n;
-                            result += alphabet[mixedIdx];
-                        }
-                        return result;
-                    }
-
-                    _unmixBlocks(mixed, prev) {
-                        const alphabet = this.shuffledAlphabet;
-                        const n = this.alphabetSize;
-                        let result = '';
-                        for (let i = 0; i < mixed.length; i++) {
-                            const idx1 = alphabet.indexOf(mixed[i]);
-                            const idx2 = alphabet.indexOf(prev[i]);
-                            const plainIdx = (idx1 - idx2 + n) % n;
-                            result += alphabet[plainIdx];
-                        }
-                        return result;
-                    }
-
-                    _feistelRound(left, right, roundKey, roundNum) {
-                        const combined = CryptoJS.enc.Utf8.parse(right + CryptoJS.enc.Hex.parse(roundKey));
-                        const key = CryptoJS.enc.Hex.parse(this.cipherKey);
-                        const hmac = CryptoJS.HmacSHA256(combined, key);
-                        const prfOutput = hmac.toString(CryptoJS.enc.Hex);
-                        let prfNum = BigInt('0x' + prfOutput);
-
-                        let newLeft = '';
-                        for (let i = 0; i < left.length; i++) {
-                            const sboxedCh = this._applySbox(left[i]);
-                            const idx = this.shuffledAlphabet.indexOf(sboxedCh);
-                            
-                            const roundFactor = (roundNum + 1) % this.alphabetSize;
-                            const shiftFactor = roundFactor === 0 ? 1 : roundFactor;
-                            const shift = Number((prfNum * BigInt(shiftFactor)) % BigInt(this.alphabetSize));
-                            
-                            const newIdx = (idx + shift) % this.alphabetSize;
-                            newLeft += this.shuffledAlphabet[newIdx];
-                        }
-                        return [right, newLeft];
-                    }
-
-                    _feistelEncryptBlock(block) {
-                        const mid = Math.floor(block.length / 2);
-                        let left = block.slice(0, mid);
-                        let right = block.slice(mid);
-
-                        for (let i = 0; i < this.rounds; i++) {
-                            const roundKey = this.cipherKey.slice(0, 16) + this._intToHex(i, 4);
-                            [left, right] = this._feistelRound(left, right, roundKey, i);
-                        }
-                        return left + right;
-                    }
-
-                    _feistelDecryptBlock(block) {
-                        const mid = Math.floor(block.length / 2);
-                        let left = block.slice(0, mid);
-                        let right = block.slice(mid);
-
-                        for (let i = this.rounds - 1; i >= 0; i--) {
-                            const roundKey = this.cipherKey.slice(0, 16) + this._intToHex(i, 4);
-                            
-                            const oldRight = left;
-                            const combined = CryptoJS.enc.Utf8.parse(oldRight + CryptoJS.enc.Hex.parse(roundKey));
-                            const key = CryptoJS.enc.Hex.parse(this.cipherKey);
-                            const hmac = CryptoJS.HmacSHA256(combined, key);
-                            const prfOutput = hmac.toString(CryptoJS.enc.Hex);
-                            let prfNum = BigInt('0x' + prfOutput);
-                            
-                            const roundFactor = (i + 1) % this.alphabetSize;
-                            const shiftFactor = roundFactor === 0 ? 1 : roundFactor;
-                            const shift = Number((prfNum * BigInt(shiftFactor)) % BigInt(this.alphabetSize));
-
-                            let oldLeft = '';
-                            for (let j = 0; j < right.length; j++) {
-                                const idx = this.shuffledAlphabet.indexOf(right[j]);
-                                const oldIdx = (idx - shift + this.alphabetSize) % this.alphabetSize;
-                                const shiftedCh = this.shuffledAlphabet[oldIdx];
-                                const originalCh = this._applyInverseSbox(shiftedCh);
-                                oldLeft += originalCh;
-                            }
-
-                            left = oldLeft;
-                            right = oldRight;
-                        }
-                        return left + right;
-                    }
-
-                    _intToHex(num, bytes) {
-                        let hex = '';
-                        for (let i = 0; i < bytes; i++) {
-                            const byte = (num >> (8 * (bytes - 1 - i))) & 0xFF;
-                            hex += byte.toString(16).padStart(2, '0');
-                        }
-                        return hex;
-                    }
-
-                    _encodeBlock(block) {
-                        let code = BigInt(0);
-                        for (let i = 0; i < block.length; i++) {
-                            code = code * BigInt(this.alphabetSize) + BigInt(this.shuffledAlphabet.indexOf(block[i]));
-                        }
-                        const encoded = this._toBase36(code);
-                        return encoded.padStart(24, this.base36[0]);
-                    }
-
-                    _decodeBlock(encoded) {
-                        const code = this._fromBase36(encoded);
-                        const chars = [];
-                        let tempCode = code;
-                        for (let i = 0; i < this.blockSize; i++) {
-                            const remainder = Number(tempCode % BigInt(this.alphabetSize));
-                            chars.unshift(this.shuffledAlphabet[remainder]);
-                            tempCode = tempCode / BigInt(this.alphabetSize);
-                        }
-                        return chars.join('');
-                    }
-
-                    _generateIV() {
-                        let iv = '';
-                        for (let i = 0; i < this.blockSize; i++) {
-                            const randomValues = new Uint8Array(2);
-                            crypto.getRandomValues(randomValues);
-                            const randomIndex = ((randomValues[0] << 8) | randomValues[1]) % this.alphabetSize;
-                            iv += this.shuffledAlphabet[randomIndex];
-                        }
-                        return iv;
-                    }
-
-                    _group(s, n = 6) {
-                        const chunks = [];
-                        for (let i = 0; i < s.length; i += n) {
-                            chunks.push(s.slice(i, i + n));
-                        }
-                        return chunks.join(' ');
-                    }
-
-                    encrypt(plaintext) {
-                        const blocks = this._textToBlocks(plaintext);
-                        const ivBlock = this._generateIV();
-                        let prev = ivBlock;
-                        const ciphertextBlocks = [];
-
-                        for (const block of blocks) {
-                            const mixed = this._mixBlocks(block, prev);
-                            const feistelEnc = this._feistelEncryptBlock(mixed);
-                            const ct = this._encodeBlock(feistelEnc);
-                            ciphertextBlocks.push(ct);
-                            prev = feistelEnc;
-                        }
-
-                        const ivEnc = this._encodeBlock(ivBlock);
-                        const body = ivEnc + ciphertextBlocks.join('');
-
-                        // MAC calculation как в Python
-                        const bodyBytes = CryptoJS.enc.Utf8.parse(body);
-                        const macKeyBytes = CryptoJS.enc.Hex.parse(this.macKey);
-                        const macHmac = CryptoJS.HmacSHA256(bodyBytes, macKeyBytes);
-                        const macFull = macHmac.toString(CryptoJS.enc.Hex);
-                        const mac16 = macFull.slice(0, 32); // 16 bytes in hex
-                        const macNum = BigInt('0x' + mac16);
-                        const macBase36 = this._toBase36(macNum).padStart(25, this.base36[0]);
-
-                        // Формат как в Python: {тело} : {MAC}
-                        const bodyGrouped = this._group(body);
-                        const macGrouped = this._group(macBase36);
-                        return `${bodyGrouped} : ${macGrouped}`;
-                    }
-
-                    decrypt(ciphertextWithMac) {
-                        if (!ciphertextWithMac.includes(" : ")) {
-                            throw new Error("Формат: тело : mac");
-                        }
-
-                        const [bodyPart, macPart] = ciphertextWithMac.split(" : ", 2);
-                        const bodyClean = bodyPart.replace(/ /g, "");
-                        const macClean = macPart.replace(/ /g, "");
-
-                        if (macClean.length !== 25) {
-                            throw new Error("MAC должен быть 25 символов");
-                        }
-
-                        // Verify MAC
-                        const bodyBytes = CryptoJS.enc.Utf8.parse(bodyClean);
-                        const macKeyBytes = CryptoJS.enc.Hex.parse(this.macKey);
-                        const expectedMacHmac = CryptoJS.HmacSHA256(bodyBytes, macKeyBytes);
-                        const expectedMacFull = expectedMacHmac.toString(CryptoJS.enc.Hex);
-                        const expectedMac16 = expectedMacFull.slice(0, 32);
-                        const expectedMacNum = BigInt('0x' + expectedMac16);
-                        const expectedMacBase36 = this._toBase36(expectedMacNum).padStart(25, this.base36[0]);
-
-                        if (macClean !== expectedMacBase36) {
-                            throw new Error("Неверный MAC или ключ!");
-                        }
-
-                        if (bodyClean.length < 24 || bodyClean.length % 24 !== 0) {
-                            throw new Error("Некорректная длина тела");
-                        }
-
-                        const ivEnc = bodyClean.slice(0, 24);
-                        const ctEnc = bodyClean.slice(24);
-
-                        const ivBlock = this._decodeBlock(ivEnc);
-                        let prev = ivBlock;
-                        const plaintextBlocks = [];
-
-                        for (let i = 0; i < ctEnc.length; i += 24) {
-                            const encBlock = ctEnc.slice(i, i + 24);
-                            const feistelDec = this._decodeBlock(encBlock);
-                            const mixed = this._feistelDecryptBlock(feistelDec);
-                            const plainBlock = this._unmixBlocks(mixed, prev);
-                            plaintextBlocks.push(plainBlock);
-                            prev = feistelDec;
-                        }
-
-                        return this._unpad(plaintextBlocks.join(''));
-                    }
-                }
-
-                const processSRPC = () => {
-                    if (!masterKey.value) {
-                        showStatus('Ошибка: Введите ключ', 'error');
-                        return;
-                    }
-                    if (masterKey.value.length < PASS_MIN_LENGTH) {
-                        showStatus('Ошибка: Ключ должен быть не менее 20 символов', 'error');
-                        return;
-                    }
-
-                    generateDerivedKeys();
-
-                    try {
-                        const cipher = new SRPC(masterKey.value);
-                        
-                        if (srpcMode.value === 'encrypt') {
-                            outputText.value = cipher.encrypt(inputText.value);
-                            showStatus('Текст успешно зашифрован', 'success');
-                        } else {
-                            outputText.value = cipher.decrypt(inputText.value);
-                            showStatus('Текст успешно расшифрован', 'success');
-                        }
-                    } catch (error) {
-                        showStatus('Ошибка: ' + error.message, 'error');
-                        outputText.value = '';
-                        console.error('SRPC Error:', error);
-                    }
-                };
-
-                const showStatus = (message, type) => {
-                    statusMessage.value = message;
-                    switch (type) {
-                        case 'success':
-                            statusClass.value = 'bg-green-50 text-green-700 border border-green-200';
-                            break;
-                        case 'error':
-                            statusClass.value = 'bg-red-50 text-red-700 border border-red-200';
-                            break;
-                        default:
-                            statusClass.value = 'bg-blue-50 text-blue-700 border border-blue-200';
-                    }
-                    setTimeout(() => {
-                        statusMessage.value = '';
-                    }, 5000);
-                };
-
-                const copyToClipboard = async () => {
-                    try {
-                        await navigator.clipboard.writeText(outputText.value);
-                        showStatus('Текст скопирован в буфер обмена', 'success');
-                    } catch (err) {
-                        showStatus('Ошибка копирования', 'error');
-                    }
-                };
-
-                const swapTexts = () => {
-                    [inputText.value, outputText.value] = [outputText.value, inputText.value];
-                    srpcMode.value = srpcMode.value === 'encrypt' ? 'decrypt' : 'encrypt';
-                    showStatus('Тексты поменяны местами', 'info');
-                };
-
-                const clearAll = () => {
-                    inputText.value = '';
-                    outputText.value = '';
-                    showStatus('Все поля очищены', 'info');
-                };
-
-                return {
-                    inputText,
-                    outputText,
-                    masterKey,
-                    cipherKey,
-                    macKey,
-                    srpcMode,
-                    statusMessage,
-                    statusClass,
-                    showCipherInfo,
-                    keyStatus,
-                    keyStatusClass,
-                    processSRPC,
-                    copyToClipboard,
-                    swapTexts,
-                    clearAll,
-                    toggleCipherInfo,
-                    saveKey,
-                    loadKey,
-                    clearKey,
-                    generateRandomKey,
-                    copyCipherKey,
-                    copyMacKey,
-                    generateDerivedKeys
-                };
+                
+                // Загружаем micropip для установки пакетов
+                await pyodide.loadPackage("micropip");
+                const micropip = pyodide.pyimport("micropip");
+                
+                
+                // Загружаем SRPC код
+                await loadSRPCCode();
+                
+                document.getElementById('processBtn').disabled = false;
+            } catch (error) {
+                console.error('Pyodide initialization error:', error);
             }
-        }).mount('#app');
+        }
+
+        // Загрузка SRPC кода
+        async function loadSRPCCode() {
+            try {
+                // Ваш оригинальный Python код
+                const srpcCode = `
+import hmac
+import secrets
+from hashlib import sha256
+
+class SRPC:
+    def __init__(self, key: str):
+        if not key:
+            raise ValueError("Ключ не может быть пустым")
+        self.master_key = key.encode('utf-8')
+
+        # Входной алфавит (162 символа)
+        self.plain_alphabet = (
+            "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+            "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            "abcdefghijklmnopqrstuvwxyz"
+            "0123456789 \\n"
+            + "!\\"#$%&'()*+,-./:;<=>?@[\\\\]^_\`{|}~"
+        )
+        self.alphabet_size = len(self.plain_alphabet)
+        self.base36 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        self.base36_size = 36
+
+        # 🚀 Увеличен размер блока с 4 до 16 символов
+        self.block_size = 16
+        
+        # Проверка: 162^16 <= 36^24?
+        if self.alphabet_size ** self.block_size > self.base36_size ** 24:
+            raise ValueError("Алфавит слишком велик для 16→24 схемы")
+
+        # 🚀 Усиленные ключевые производные с солями
+        salt = "srpc_v2_salt_2024_secure_random_bytes"
+        salted_key = key + salt
+        self.cipher_key = hmac.new(salted_key.encode('utf-8'), b"cipher_key_derivation", sha256).digest()
+        self.mac_key = hmac.new(salted_key.encode('utf-8'), b"mac_key_derivation", sha256).digest()
+
+        # Перемешанный алфавит
+        self.shuffled_alphabet = self._shuffle_alphabet(self.plain_alphabet, self.cipher_key)
+        # S-Box: индекс -> индекс (перестановка)
+        self.sbox = self._generate_sbox(self.cipher_key)
+
+    def _shuffle_alphabet(self, alphabet: str, key_material: bytes) -> str:
+        letters = list(alphabet)
+        n = len(letters)
+        key_bytes = list(key_material)
+        for i in range(n - 1, 0, -1):
+            j = key_bytes[i % len(key_bytes)] % (i + 1)
+            letters[i], letters[j] = letters[j], letters[i]
+        return ''.join(letters)
+
+    def _generate_sbox(self, key_material: bytes) -> list[int]:
+        indices = list(range(self.alphabet_size))
+        n = len(indices)
+        key_bytes = list(key_material)
+        for i in range(n - 1, 0, -1):
+            j = key_bytes[i % len(key_bytes)] % (i + 1)
+            indices[i], indices[j] = indices[j], indices[i]
+        return indices
+
+    def _to_base36(self, num: int) -> str:
+        if num == 0:
+            return self.base36[0]
+        s = ""
+        while num:
+            s = self.base36[num % self.base36_size] + s
+            num //= self.base36_size
+        return s
+
+    def _from_base36(self, s: str) -> int:
+        num = 0
+        for ch in s:
+            if 'A' <= ch <= 'Z':
+                val = ord(ch) - ord('A')
+            else:
+                val = ord(ch) - ord('0') + 26
+            num = num * self.base36_size + val
+        return num
+
+    def _pad(self, text: str, block_size: int) -> str:
+        pad_len = block_size - (len(text) % block_size)
+        if pad_len == 0:
+            pad_len = block_size
+        padding_char = self.shuffled_alphabet[(pad_len - 1) % self.alphabet_size]
+        return text + (padding_char * pad_len)
+
+    def _unpad(self, text: str) -> str:
+        if not text:
+            return text
+        last_char = text[-1]
+        try:
+            pad_idx = self.shuffled_alphabet.index(last_char)
+        except ValueError:
+            raise ValueError(f"Некорректный символ паддинга {last_char}")
+        pad_len = pad_idx + 1
+
+        if pad_len < 1 or pad_len > self.block_size:
+            raise ValueError(f"Некорректная длина паддинга {pad_len} > {self.block_size}")
+
+        if len(text) < pad_len or text[-pad_len:] != last_char * pad_len:
+            raise ValueError("Некорректный паддинг")
+
+        return text[:-pad_len]
+
+    def _text_to_blocks(self, text: str, block_size: int) -> list[str]:
+        padded = self._pad(text, block_size)
+        return [padded[i:i+block_size] for i in range(0, len(padded), block_size)]
+
+    def _blocks_to_text(self, blocks: list[str]) -> str:
+        text = ''.join(blocks)
+        return self._unpad(text)
+
+    def _apply_sbox(self, ch: str) -> str:
+        idx = self.shuffled_alphabet.index(ch)
+        new_idx = self.sbox[idx]
+        return self.shuffled_alphabet[new_idx]
+
+    def _apply_inverse_sbox(self, ch: str) -> str:
+        idx = self.shuffled_alphabet.index(ch)
+        for i, v in enumerate(self.sbox):
+            if v == idx:
+                orig_idx = i
+                break
+        return self.shuffled_alphabet[orig_idx]
+
+    def _mix_blocks(self, block: str, prev: str) -> str:
+        alphabet = self.shuffled_alphabet
+        n = self.alphabet_size
+        result = ''
+        for i in range(len(block)):
+            idx1 = alphabet.index(block[i])
+            idx2 = alphabet.index(prev[i])
+            mixed_idx = (idx1 + idx2) % n
+            result += alphabet[mixed_idx]
+        return result
+
+    def _unmix_blocks(self, mixed: str, prev: str) -> str:
+        alphabet = self.shuffled_alphabet
+        n = self.alphabet_size
+        result = ''
+        for i in range(len(mixed)):
+            idx1 = alphabet.index(mixed[i])
+            idx2 = alphabet.index(prev[i])
+            plain_idx = (idx1 - idx2) % n
+            result += alphabet[plain_idx]
+        return result
+
+    def _feistel_round(self, left: str, right: str, round_key: bytes, round_num: int) -> tuple[str, str]:
+        combined = right.encode('utf-8') + round_key
+        prf_output = hmac.new(self.cipher_key, combined, sha256).digest()
+        prf_num = int.from_bytes(prf_output, 'big')
+
+        new_left = ''
+        for ch in left:
+            sboxed_ch = self._apply_sbox(ch)
+            idx = self.shuffled_alphabet.index(sboxed_ch)
+            
+            round_factor = (round_num + 1) % self.alphabet_size
+            if round_factor == 0:
+                round_factor = 1
+            shift = (prf_num * round_factor) % self.alphabet_size
+            new_idx = (idx + shift) % self.alphabet_size
+            new_left += self.shuffled_alphabet[new_idx]
+            
+        return right, new_left
+
+    def _feistel_encrypt_block(self, block: str) -> str:
+        mid = len(block) // 2
+        left = block[:mid]
+        right = block[mid:]
+        
+        for i in range(12):
+            round_key = self.cipher_key[:16] + i.to_bytes(4, 'big')
+            left, right = self._feistel_round(left, right, round_key, i)
+        return left + right
+
+    def _feistel_decrypt_block(self, block: str) -> str:
+        mid = len(block) // 2
+        left = block[:mid]
+        right = block[mid:]
+
+        for i in range(11, -1, -1):
+            round_key = self.cipher_key[:16] + i.to_bytes(4, 'big')
+
+            old_right = left
+            combined = old_right.encode('utf-8') + round_key
+            prf_output = hmac.new(self.cipher_key, combined, sha256).digest()
+            prf_num = int.from_bytes(prf_output, 'big')
+            
+            round_factor = (i + 1) % self.alphabet_size
+            if round_factor == 0:
+                round_factor = 1
+            shift = (prf_num * round_factor) % self.alphabet_size
+
+            old_left = ''
+            for ch in right:
+                idx = self.shuffled_alphabet.index(ch)
+                old_idx = (idx - shift) % self.alphabet_size
+                shifted_ch = self.shuffled_alphabet[old_idx]
+                original_ch = self._apply_inverse_sbox(shifted_ch)
+                old_left += original_ch
+
+            left = old_left
+            right = old_right
+
+        return left + right
+
+    def _encode_block(self, block: str) -> str:
+        code = 0
+        for ch in block:
+            code = code * self.alphabet_size + self.shuffled_alphabet.index(ch)
+        encoded = self._to_base36(code)
+        return encoded.rjust(24, self.base36[0])
+
+    def _decode_block(self, encoded: str) -> str:
+        code = self._from_base36(encoded)
+        chars = []
+        for _ in range(self.block_size):
+            code, r = divmod(code, self.alphabet_size)
+            chars.append(self.shuffled_alphabet[r])
+        decoded = ''.join(reversed(chars))
+        return decoded
+
+    def _group(self, s: str, n: int = 6) -> str:
+        return ' '.join(s[i:i+n] for i in range(0, len(s), n))
+
+    def encrypt(self, plaintext: str) -> str:
+        blocks = self._text_to_blocks(plaintext, self.block_size)
+
+        # ✅ Безопасная генерация IV
+        iv_block = ''.join(
+            self.shuffled_alphabet[secrets.randbelow(self.alphabet_size)]
+            for _ in range(self.block_size)
+        )
+
+        prev = iv_block
+        ciphertext_blocks = []
+        for block in blocks:
+            mixed = self._mix_blocks(block, prev)
+            feistel_enc = self._feistel_encrypt_block(mixed)
+            ct = self._encode_block(feistel_enc)
+            ciphertext_blocks.append(ct)
+            prev = feistel_enc
+
+        iv_enc = self._encode_block(iv_block)
+        body = iv_enc + ''.join(ciphertext_blocks)
+
+        mac_full = hmac.new(self.mac_key, body.encode('utf-8'), sha256).digest()
+        mac_16 = mac_full[:16]
+        mac_num = int.from_bytes(mac_16, 'big')
+        mac_base36 = self._to_base36(mac_num).rjust(25, self.base36[0])
+
+        body_grouped = self._group(body, 6)
+        mac_grouped = self._group(mac_base36, 6)
+        return f"{body_grouped} : {mac_grouped}"
+
+    def decrypt(self, ciphertext_with_mac: str) -> str:
+        if " : " not in ciphertext_with_mac:
+            raise ValueError("Формат: тело : mac")
+
+        body_part, mac_part = ciphertext_with_mac.split(" : ", 1)
+        body_clean = body_part.replace(" ", "")
+        mac_clean = mac_part.replace(" ", "")
+
+        if len(mac_clean) != 25:
+            raise ValueError("MAC должен быть 25 символов")
+
+        expected_mac_full = hmac.new(self.mac_key, body_clean.encode('utf-8'), sha256).digest()
+        expected_mac = expected_mac_full[:16]
+        mac_bytes = self._from_base36(mac_clean).to_bytes(16, 'big')
+        if not hmac.compare_digest(mac_bytes, expected_mac):
+            raise ValueError("Неверный MAC!")
+
+        if len(body_clean) < 24 or len(body_clean) % 24 != 0:
+            raise ValueError("Некорректная длина тела")
+
+        iv_enc = body_clean[:24]
+        ct_enc = body_clean[24:]
+
+        iv_block = self._decode_block(iv_enc)
+        prev = iv_block
+        plaintext_blocks = []
+
+        for i in range(0, len(ct_enc), 24):
+            enc_block = ct_enc[i:i+24]
+            feistel_dec = self._decode_block(enc_block)
+
+            mixed = self._feistel_decrypt_block(feistel_dec)
+
+            plain_block = self._unmix_blocks(mixed, prev)
+
+            plaintext_blocks.append(plain_block)
+            prev = feistel_dec
+
+        return self._blocks_to_text(plaintext_blocks)
+
+# Создаем глобальный экземпляр для использования
+srpc_instance = None
+`;
+
+                // Выполняем код SRPC
+                await pyodide.runPythonAsync(srpcCode);
+                srpcModule = pyodide.pyimport("__main__");
+            } catch (error) {
+                console.error('SRPC code loading error:', error);
+                throw error;
+            }
+        }
+
+        // Основная функция обработки - ИСПРАВЛЕННАЯ ВЕРСИЯ
+        // Альтернативный подход с созданием Python функции
+        async function processSRPC() {
+            const inputText = document.getElementById('inputText').value;
+            const masterKey = document.getElementById('masterKey').value;
+            const mode = document.getElementById('srpcMode').value;
+            
+            if (!masterKey || masterKey.length < 20 || !inputText) {
+                showStatus('Проверьте ввод ключа и текста', 'error');
+                return;
+            }
+
+            try {
+                // Создаем Python функцию для обработки
+                await pyodide.runPythonAsync(`
+        def srpc_operation(mode, key, text):
+            try:
+                cipher = SRPC(key)
+                if mode == "encrypt":
+                    return cipher.encrypt(text)
+                else:
+                    return cipher.decrypt(text)
+            except Exception as e:
+                return f"ERROR: {str(e)}"
+        `);
+                
+                // Вызываем Python функцию
+                const srpc_func = pyodide.globals.get('srpc_operation');
+                const result = srpc_func(mode, masterKey, inputText);
+                const resultStr = String(result);
+                
+                document.getElementById('outputText').value = resultStr;
+                
+                if (resultStr.startsWith('ERROR:')) {
+                    showStatus('Ошибка: ' + resultStr.substring(6), 'error');
+                } else {
+                    showStatus('Операция выполнена успешно!', 'success');
+                }
+                
+                // Очищаем
+                srpc_func.destroy();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        // Вспомогательные функции
+        function toggleCipherInfo() {
+            const info = document.getElementById('cipher-info');
+            const arrow = document.getElementById('cipher-arrow');
+            if (info.classList.contains('hidden')) {
+                info.classList.remove('hidden');
+                arrow.classList.add('rotate-180');
+            } else {
+                info.classList.add('hidden');
+                arrow.classList.remove('rotate-180');
+            }
+        }
+
+        function updateKeyLength() {
+            const key = document.getElementById('masterKey').value;
+            const lengthSpan = document.getElementById('key-length');
+            const warning = document.getElementById('key-warning');
+            
+            lengthSpan.textContent = key.length;
+            
+            if (key.length > 0 && key.length < 20) {
+                warning.classList.remove('hidden');
+            } else {
+                warning.classList.add('hidden');
+            }
+        }
+
+        function generateRandomKey() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+            const length = Math.floor(Math.random() * 11) + 20; // 20-30 символов
+            let result = '';
+            
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            
+            document.getElementById('masterKey').value = result;
+            updateKeyLength();
+            showKeyStatus(`Сгенерирован случайный ключ (${length} символов)`, 'success');
+        }
+
+        function saveKey() {
+            const key = document.getElementById('masterKey').value;
+            if (!key.trim()) {
+                showKeyStatus('Ошибка: Ключ не может быть пустым', 'error');
+                return;
+            }
+            if (key.length < 20) {
+                showKeyStatus('Ошибка: Ключ должен быть не менее 20 символов', 'error');
+                return;
+            }
+            try {
+                localStorage.setItem('srpc_key', key);
+                showKeyStatus('Ключ успешно сохранен', 'success');
+            } catch (error) {
+                showKeyStatus('Ошибка сохранения ключа', 'error');
+            }
+        }
+
+        function loadKey() {
+            try {
+                const savedKey = localStorage.getItem('srpc_key');
+                if (savedKey) {
+                    document.getElementById('masterKey').value = savedKey;
+                    updateKeyLength();
+                    showKeyStatus('Ключ загружен', 'success');
+                } else {
+                    showKeyStatus('Сохраненный ключ не найден', 'warning');
+                }
+            } catch (error) {
+                showKeyStatus('Ошибка загрузки ключа', 'error');
+            }
+        }
+
+        function clearKey() {
+            try {
+                localStorage.removeItem('srpc_key');
+                document.getElementById('masterKey').value = '';
+                updateKeyLength();
+                showKeyStatus('Ключ удален', 'info');
+            } catch (error) {
+                showKeyStatus('Ошибка удаления ключа', 'error');
+            }
+        }
+
+        function clearAll() {
+            document.getElementById('inputText').value = '';
+            document.getElementById('outputText').value = '';
+            showStatus('Все поля очищены', 'info');
+        }
+
+        async function copyToClipboard() {
+            const text = document.getElementById('outputText').value;
+            if (!text) {
+                showStatus('Нет текста для копирования', 'warning');
+                return;
+            }
+            try {
+                await navigator.clipboard.writeText(text);
+                showStatus('Текст скопирован в буфер обмена', 'success');
+            } catch (err) {
+                showStatus('Ошибка копирования', 'error');
+            }
+        }
+
+        function swapTexts() {
+            const inputText = document.getElementById('inputText');
+            const outputText = document.getElementById('outputText');
+            const mode = document.getElementById('srpcMode');
+            
+            [inputText.value, outputText.value] = [outputText.value, inputText.value];
+            mode.value = mode.value === 'encrypt' ? 'decrypt' : 'encrypt';
+            document.getElementById('processBtn').textContent = mode.value === 'encrypt' ? 'Зашифровать' : 'Расшифровать';
+            showStatus('Тексты поменяны местами', 'info');
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status-message');
+            const statusText = document.getElementById('status-text');
+            
+            statusText.textContent = message;
+            statusDiv.className = 'mb-4 p-4 rounded-lg ';
+            
+            switch (type) {
+                case 'success':
+                    statusDiv.classList.add('bg-green-50', 'text-green-700', 'border', 'border-green-200');
+                    break;
+                case 'error':
+                    statusDiv.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200');
+                    break;
+                case 'warning':
+                    statusDiv.classList.add('bg-yellow-50', 'text-yellow-700', 'border', 'border-yellow-200');
+                    break;
+                case 'info':
+                    statusDiv.classList.add('bg-blue-50', 'text-blue-700', 'border', 'border-blue-200');
+                    break;
+            }
+            
+            statusDiv.classList.remove('hidden');
+            
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        function showKeyStatus(message, type) {
+            const keyStatus = document.getElementById('key-status');
+            keyStatus.textContent = message;
+            keyStatus.className = 'text-sm text-center p-2 rounded ';
+            
+            switch (type) {
+                case 'success':
+                    keyStatus.classList.add('bg-green-50', 'text-green-700', 'border', 'border-green-200');
+                    break;
+                case 'error':
+                    keyStatus.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200');
+                    break;
+                case 'warning':
+                    keyStatus.classList.add('bg-yellow-50', 'text-yellow-700', 'border', 'border-yellow-200');
+                    break;
+                case 'info':
+                    keyStatus.classList.add('bg-blue-50', 'text-blue-700', 'border', 'border-blue-200');
+                    break;
+            }
+            
+            keyStatus.classList.remove('hidden');
+            
+            setTimeout(() => {
+                keyStatus.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            updateKeyLength();
+            loadKey();
+            initializePyodide();
+            
+            // Обновляем текст кнопки при изменении режима
+            document.getElementById('srpcMode').addEventListener('change', function() {
+                document.getElementById('processBtn').textContent = 
+                    this.value === 'encrypt' ? 'Зашифровать' : 'Расшифровать';
+            });
+        });
     </script>
 </body>
 </html>
